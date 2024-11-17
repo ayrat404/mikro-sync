@@ -4,20 +4,20 @@ import (
 	"sync"
 )
 
-type IpCache struct {
+type IPCache struct {
 	cache map[string]struct{}
 	mu    sync.RWMutex
 }
 
-func NewIpCache(ips []string) *IpCache {
-	cache := &IpCache{
+func NewIPCache(ips []string) *IPCache {
+	cache := &IPCache{
 		cache: make(map[string]struct{}),
 	}
 	cache.Add(ips)
 	return cache
 }
 
-func (c *IpCache) Add(ips []string) bool {
+func (c *IPCache) Add(ips []string) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -32,7 +32,7 @@ func (c *IpCache) Add(ips []string) bool {
 	return added
 }
 
-func (c *IpCache) Exists(ip string) bool {
+func (c *IPCache) Exists(ip string) bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
