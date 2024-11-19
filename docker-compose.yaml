@@ -1,0 +1,21 @@
+version: '3.8'
+name: mikro-sync
+
+services:
+  dns-proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "53:53"
+    environment:
+      - LISTEN_ADDR # default  0.0.0.0:53
+      - FORWARD_ADDR=192.168.88.1
+      - DOMAIN_LIST_URLS # https://example.com/hosts.txt,https://example2.com/hosts.txt
+      - DOMAIN_LIST # domain.com,example.com,example2.com
+      - MIKROTIK_ADDR=192.168.88.1
+      - MIKROTIK_PORT # default 22
+      - MIKROTIK_USER
+      - MIKROTIK_PASSWORD
+      - ADDRESS_LIST # mikrotik address list name
+    restart: unless-stopped
