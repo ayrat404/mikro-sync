@@ -21,7 +21,7 @@ var opts struct {
 	MikrotikPassword string   `long:"mikrotik-password" env:"MIKROTIK_PASSWORD" description:"Mikrotik password" required:"true"`
 	AddressList      string   `long:"address-list" env:"ADDRESS_LIST" description:"Mikrotik address list" required:"true"`
 	DomainList       string   `long:"domain-list" env:"DOMAIN_LIST" description:"List of domains to monitor, separated by commas" required:"false"`
-	DomainListURLs   []string `long:"domain-list-urls" env:"DOMAIN_LIST_URLS" description:"List of URLs to fetch domain list from" required:"false"`
+	DomainListURLs   []string `long:"domain-list-urls" env:"DOMAIN_LIST_URLS" description:"List of URLs to fetch domain list from" env-delim:"," required:"false"`
 }
 
 func main() {
