@@ -14,6 +14,6 @@ FROM alpine:latest
 WORKDIR /app
 COPY --from=builder /app/main .
 
-EXPOSE 53
+EXPOSE 53/udp
 
 CMD ["./main"]

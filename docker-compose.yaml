@@ -7,7 +7,7 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "53:53"
+      - "53:53/udp"
     environment:
       - LISTEN_ADDR # default  0.0.0.0:53
       - FORWARD_ADDR=192.168.88.1
