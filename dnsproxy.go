@@ -42,49 +42,56 @@ func (p *DnsProxy) Start(ctx context.Context) error {
 
 func (p *DnsProxy) handleDNSRequest(w dns.ResponseWriter, r *dns.Msg) {
 	client := new(dns.Client)
+	client.UDPSize = 4096
 	resp, _, err := client.Exchange(r, p.forwardAddr)
 	if err != nil {
-		log.Printf("Failed to forward request: %s", err.Error())
+		log.Printf("Failed to forward request: %v", err)
 		dns.HandleFailed(w, r)
 		return
 	}
 
 	for _, question := range r.Question {
-		ips := p.extractIPs(resp, question.Name)
+		ips := extractIPs(resp, question.Name)
 		if len(ips) > 0 {
 			p.callback(question.Name, ips)
 		}
 	}
 
 	if err := w.WriteMsg(resp); err != nil {
-		log.Printf("Failed to write response: %s", err.Error())
+		log.Printf("Failed to write response: %v", err)
 	}
 }
 
-func (p *DnsProxy) extractIPs(resp *dns.Msg, domain string) []net.IP {
+func extractIPs(resp *dns.Msg, domain string) []net.IP {
 	var ips []net.IP
-	var cnames []string
+	var cNames []string
+	visited := make(map[string]bool)
 
-	for _, rr := range resp.Answer {
-		switch rr := rr.(type) {
-		case *dns.A:
-			if rr.Hdr.Name == domain {
-				ips = append(ips, rr.A)
-			}
-		case *dns.CNAME:
-			if rr.Hdr.Name == domain {
-				cnames = append(cnames, rr.Target)
-			}
+	var extract func(resp *dns.Msg, domain string)
+	extract = func(resp *dns.Msg, domain string) {
+		if visited[domain] {
+			return
 		}
-	}
+		visited[domain] = true
 
-	for _, cname := range cnames {
 		for _, rr := range resp.Answer {
-			if aRecord, ok := rr.(*dns.A); ok && aRecord.Hdr.Name == cname {
-				ips = append(ips, aRecord.A)
+			switch rr := rr.(type) {
+			case *dns.A:
+				if rr.Hdr.Name == domain {
+					ips = append(ips, rr.A)
+				}
+			case *dns.CNAME:
+				if rr.Hdr.Name == domain {
+					cNames = append(cNames, rr.Target)
+				}
 			}
+		}
+
+		for _, cName := range cNames {
+			extract(resp, cName)
 		}
 	}
 
+	extract(resp, domain)
 	return ips
 }
