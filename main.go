@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 )
 
 var opts struct {
@@ -51,6 +52,14 @@ func main() {
 	ipCache := NewIPCache(ipAddresses)
 	log.Printf("Loaded %d IP addresses from Mikrotik", len(ipAddresses))
 
+	domainIps, err := mikrotikClient.GetDomainIPsFromLogs()
+	if err != nil {
+		log.Fatalf("Failed to get domain IPs from logs: %s", err)
+	}
+	for domain, ips := range domainIps {
+		log.Printf("Domain %s has IPs %s", domain, strings.Join(ips, ", "))
+	}
+
 	domainList := NewDomainList(strings.Split(opts.DomainList, ","))
 	if opts.DomainListURLs != nil && len(opts.DomainListURLs) > 0 {
 		err = domainList.LoadFromURLs(opts.DomainListURLs)
@@ -60,9 +69,38 @@ func main() {
 		log.Printf("Loaded domain list")
 	}
 
-	proxy := NewDnsProxy(opts.ListenAddr, opts.ForwardAddr, callbackFunc(ipCache, mikrotikClient, domainList))
-	if err := proxy.Start(ctx); err != nil {
-		log.Fatalf("Failed to start DNS proxy: %s", err)
+	go startDomainLogMonitor(ctx, mikrotikClient, callbackFunc(ipCache, mikrotikClient, domainList))
+
+	<-ctx.Done()
+
+	//proxy := NewDnsProxy(opts.ListenAddr, opts.ForwardAddr, callbackFunc(ipCache, mikrotikClient, domainList))
+	//if err := proxy.Start(ctx); err != nil {
+	//	log.Fatalf("Failed to start DNS proxy: %s", err)
+	//}
+}
+
+func startDomainLogMonitor(ctx context.Context, mikrotikClient *MikrotikClient, callback func(domain string, ips []net.IP)) {
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			domainIps, err := mikrotikClient.GetDomainIPsFromLogs()
+			if err != nil {
+				log.Printf("Failed to get domain IPs from logs: %s", err)
+				continue
+			}
+			for domain, ips := range domainIps {
+				var netIps []net.IP
+				for _, ip := range ips {
+					netIps = append(netIps, net.ParseIP(ip))
+				}
+				callback(domain, netIps)
+			}
+		}
 	}
 }
 

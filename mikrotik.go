@@ -93,3 +93,44 @@ func (c *MikrotikClient) GetAddressesFromList() ([]string, error) {
 
 	return ips, nil
 }
+
+func (c *MikrotikClient) GetDomainIPsFromLogs() (map[string][]string, error) {
+	client, err := ssh.Dial("tcp", c.addr, c.config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to dial: %w", err)
+	}
+	defer client.Close()
+
+	session, err := client.NewSession()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create session: %w", err)
+	}
+	defer session.Close()
+
+	cmd := "/log print where topics~\"dns.packet\" and time>([/system clock get time] - 20s)"
+	output, err := session.CombinedOutput(cmd)
+	if err != nil {
+		return nil, fmt.Errorf("failed to run command: %w", err)
+	}
+
+	domainIPs := make(map[string][]string)
+	lines := strings.Split(string(output), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.Contains(line, "dns,packet") {
+			start := strings.Index(line, "<")
+			end := strings.Index(line, ">")
+			if start != -1 && end != -1 {
+				entry := line[start+1 : end]
+				parts := strings.Split(entry, ":")
+				if len(parts) == 3 && parts[1] == "A" {
+					domain := parts[0]
+					ip := strings.Split(parts[2], "=")[1]
+					domainIPs[domain] = append(domainIPs[domain], ip)
+				}
+			}
+		}
+	}
+
+	return domainIPs, nil
+}
