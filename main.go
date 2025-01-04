@@ -52,14 +52,6 @@ func main() {
 	ipCache := NewIPCache(ipAddresses)
 	log.Printf("Loaded %d IP addresses from Mikrotik", len(ipAddresses))
 
-	domainIps, err := mikrotikClient.GetDomainIPsFromLogs()
-	if err != nil {
-		log.Fatalf("Failed to get domain IPs from logs: %s", err)
-	}
-	for domain, ips := range domainIps {
-		log.Printf("Domain %s has IPs %s", domain, strings.Join(ips, ", "))
-	}
-
 	domainList := NewDomainList(strings.Split(opts.DomainList, ","))
 	if opts.DomainListURLs != nil && len(opts.DomainListURLs) > 0 {
 		err = domainList.LoadFromURLs(opts.DomainListURLs)
