@@ -113,7 +113,7 @@ func (c *MikrotikClient) GetDomainIPsFromLogs() (map[string][]string, error) {
 		return nil, fmt.Errorf("failed to run command: %w", err)
 	}
 
-	domainIPs := make(map[string][]string)
+	domainIPs := make(map[string]map[string]struct{})
 	lines := strings.Split(string(output), "\n")
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
@@ -126,11 +126,21 @@ func (c *MikrotikClient) GetDomainIPsFromLogs() (map[string][]string, error) {
 				if len(parts) == 3 && parts[1] == "A" {
 					domain := parts[0]
 					ip := strings.Split(parts[2], "=")[1]
-					domainIPs[domain] = append(domainIPs[domain], ip)
+					if domainIPs[domain] == nil {
+						domainIPs[domain] = make(map[string]struct{})
+					}
+					domainIPs[domain][ip] = struct{}{}
 				}
 			}
 		}
 	}
 
-	return domainIPs, nil
+	result := make(map[string][]string)
+	for domain, ips := range domainIPs {
+		for ip := range ips {
+			result[domain] = append(result[domain], ip)
+		}
+	}
+
+	return result, nil
 }
