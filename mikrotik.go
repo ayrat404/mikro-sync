@@ -113,7 +113,11 @@ func (c *MikrotikClient) GetDomainIPsFromLogs() (map[string][]string, error) {
 		return nil, fmt.Errorf("failed to run command: %w", err)
 	}
 
+	// Карта для хранения CNAME связей
+	cnameMap := make(map[string]string)
+	// Карта для хранения IP адресов по доменам
 	domainIPs := make(map[string]map[string]struct{})
+
 	lines := strings.Split(string(output), "\n")
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
@@ -123,18 +127,48 @@ func (c *MikrotikClient) GetDomainIPsFromLogs() (map[string][]string, error) {
 			if start != -1 && end != -1 {
 				entry := line[start+1 : end]
 				parts := strings.Split(entry, ":")
-				if len(parts) == 3 && parts[1] == "A" {
+				if len(parts) >= 3 {
 					domain := parts[0]
-					ip := strings.Split(parts[2], "=")[1]
-					if domainIPs[domain] == nil {
-						domainIPs[domain] = make(map[string]struct{})
+					recordType := parts[1]
+
+					switch recordType {
+					case "A":
+						ip := strings.Split(parts[2], "=")[1]
+						if domainIPs[domain] == nil {
+							domainIPs[domain] = make(map[string]struct{})
+						}
+						domainIPs[domain][ip] = struct{}{}
+
+						// Если есть CNAME, который указывает на этот домен,
+						// добавляем IP и к нему
+						for cname, target := range cnameMap {
+							if target == domain {
+								if domainIPs[cname] == nil {
+									domainIPs[cname] = make(map[string]struct{})
+								}
+								domainIPs[cname][ip] = struct{}{}
+							}
+						}
+					case "CNAME":
+						target := strings.Split(parts[2], "=")[1]
+						cnameMap[domain] = target
+						// Если для целевого домена уже есть IP адреса,
+						// добавляем их к CNAME домену
+						if ips, exists := domainIPs[target]; exists {
+							if domainIPs[domain] == nil {
+								domainIPs[domain] = make(map[string]struct{})
+							}
+							for ip := range ips {
+								domainIPs[domain][ip] = struct{}{}
+							}
+						}
 					}
-					domainIPs[domain][ip] = struct{}{}
 				}
 			}
 		}
 	}
 
+	// Преобразуем результат в нужный формат
 	result := make(map[string][]string)
 	for domain, ips := range domainIPs {
 		for ip := range ips {
