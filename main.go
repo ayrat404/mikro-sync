@@ -104,15 +104,10 @@ func callbackFunc(ipCache *IPCache, mikrotikClient *MikrotikClient, list *Domain
 				ipStrings[i] = ip.String()
 			}
 
-			log.Printf("Domain %s has new IPs: %s", domain, strings.Join(ipStrings, ", "))
-
 			var newIps []string
 			for _, ip := range ipStrings {
 				if !ipCache.Exists(ip) {
-					log.Printf("New IP %s for domain %s", ip, domain)
 					newIps = append(newIps, ip)
-				} else {
-					log.Printf("New IP %s for domain %s already exists", ip, domain)
 				}
 			}
 
