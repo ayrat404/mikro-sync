@@ -107,7 +107,7 @@ func (c *MikrotikClient) GetDomainIPsFromLogs() (map[string][]string, error) {
 	}
 	defer session.Close()
 
-	cmd := "/log print where topics~\"dns.packet\" and time>([/system clock get time] - 20s)"
+	cmd := "/log print where topics~\"dns.packet\""
 	output, err := session.CombinedOutput(cmd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to run command: %w", err)

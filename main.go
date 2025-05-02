@@ -72,7 +72,7 @@ func main() {
 }
 
 func startDomainLogMonitor(ctx context.Context, mikrotikClient *MikrotikClient, callback func(domain string, ips []net.IP)) {
-	ticker := time.NewTicker(2 * time.Second)
+	ticker := time.NewTicker(3 * time.Second)
 	defer ticker.Stop()
 
 	for {
