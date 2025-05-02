@@ -113,10 +113,35 @@ func (c *MikrotikClient) GetDomainIPsFromLogs() (map[string][]string, error) {
 		return nil, fmt.Errorf("failed to run command: %w", err)
 	}
 
-	// Карта для хранения CNAME связей
 	cnameMap := make(map[string]string)
-	// Карта для хранения IP адресов по доменам
 	domainIPs := make(map[string]map[string]struct{})
+
+	// Функция для рекурсивного получения IP адресов по цепочке CNAME
+	var getIPsForDomain func(domain string, visited map[string]bool) map[string]struct{}
+	getIPsForDomain = func(domain string, visited map[string]bool) map[string]struct{} {
+		if visited[domain] {
+			return nil // Предотвращаем бесконечную рекурсию
+		}
+		visited[domain] = true
+
+		ips := make(map[string]struct{})
+		// Добавляем прямые IP адреса домена
+		if directIPs, exists := domainIPs[domain]; exists {
+			for ip := range directIPs {
+				ips[ip] = struct{}{}
+			}
+		}
+
+		// Проверяем, есть ли CNAME для этого домена
+		if target, exists := cnameMap[domain]; exists {
+			// Рекурсивно получаем IP адреса целевого домена
+			targetIPs := getIPsForDomain(target, visited)
+			for ip := range targetIPs {
+				ips[ip] = struct{}{}
+			}
+		}
+		return ips
+	}
 
 	lines := strings.Split(string(output), "\n")
 	for _, line := range lines {
@@ -138,41 +163,30 @@ func (c *MikrotikClient) GetDomainIPsFromLogs() (map[string][]string, error) {
 							domainIPs[domain] = make(map[string]struct{})
 						}
 						domainIPs[domain][ip] = struct{}{}
-
-						// Если есть CNAME, который указывает на этот домен,
-						// добавляем IP и к нему
-						for cname, target := range cnameMap {
-							if target == domain {
-								if domainIPs[cname] == nil {
-									domainIPs[cname] = make(map[string]struct{})
-								}
-								domainIPs[cname][ip] = struct{}{}
-							}
-						}
 					case "CNAME":
 						target := strings.Split(parts[2], "=")[1]
 						cnameMap[domain] = target
-						// Если для целевого домена уже есть IP адреса,
-						// добавляем их к CNAME домену
-						if ips, exists := domainIPs[target]; exists {
-							if domainIPs[domain] == nil {
-								domainIPs[domain] = make(map[string]struct{})
-							}
-							for ip := range ips {
-								domainIPs[domain][ip] = struct{}{}
-							}
-						}
 					}
 				}
 			}
 		}
 	}
 
-	// Преобразуем результат в нужный формат
+	// Собираем результат с учетом всех вложенных CNAME
 	result := make(map[string][]string)
-	for domain, ips := range domainIPs {
+	for domain := range domainIPs {
+		ips := getIPsForDomain(domain, make(map[string]bool))
 		for ip := range ips {
 			result[domain] = append(result[domain], ip)
+		}
+	}
+	// Добавляем домены, которые имеют только CNAME записи
+	for domain := range cnameMap {
+		if _, exists := result[domain]; !exists {
+			ips := getIPsForDomain(domain, make(map[string]bool))
+			for ip := range ips {
+				result[domain] = append(result[domain], ip)
+			}
 		}
 	}
 
