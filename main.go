@@ -61,6 +61,24 @@ func main() {
 		log.Printf("Loaded domain list")
 	}
 
+	domains, err := mikrotikClient.GetDomainIPsFromLogs()
+	if err != nil {
+		return
+	}
+
+	domain := "api.jetbrains.ai"
+	ips, ok := domains[domain]
+	if ok {
+		contains := domainList.Contains(domain)
+		println("Domain:", domain, "Contains:", contains)
+		for _, ip := range ips {
+			println("IP:", ip, "Contains:", ipCache.Exists(ip))
+		}
+	} else {
+		println("Domain not found")
+	}
+	return
+
 	go startDomainLogMonitor(ctx, mikrotikClient, callbackFunc(ipCache, mikrotikClient, domainList))
 
 	<-ctx.Done()
@@ -104,10 +122,15 @@ func callbackFunc(ipCache *IPCache, mikrotikClient *MikrotikClient, list *Domain
 				ipStrings[i] = ip.String()
 			}
 
+			log.Printf("Domain %s has new IPs: %s", domain, strings.Join(ipStrings, ", "))
+
 			var newIps []string
 			for _, ip := range ipStrings {
 				if !ipCache.Exists(ip) {
+					log.Printf("New IP %s for domain %s", ip, domain)
 					newIps = append(newIps, ip)
+				} else {
+					log.Printf("New IP %s for domain %s already exists", ip, domain)
 				}
 			}
 
