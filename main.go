@@ -61,24 +61,6 @@ func main() {
 		log.Printf("Loaded domain list")
 	}
 
-	domains, err := mikrotikClient.GetDomainIPsFromLogs()
-	if err != nil {
-		return
-	}
-
-	domain := "api.jetbrains.ai"
-	ips, ok := domains[domain]
-	if ok {
-		contains := domainList.Contains(domain)
-		println("Domain:", domain, "Contains:", contains)
-		for _, ip := range ips {
-			println("IP:", ip, "Contains:", ipCache.Exists(ip))
-		}
-	} else {
-		println("Domain not found")
-	}
-	return
-
 	go startDomainLogMonitor(ctx, mikrotikClient, callbackFunc(ipCache, mikrotikClient, domainList))
 
 	<-ctx.Done()
